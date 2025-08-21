@@ -1,0 +1,792 @@
+import 'package:flutter/material.dart';
+import 'package:hexcolor/hexcolor.dart';
+import 'package:finalproject/API/apiFriend.dart';
+import 'package:finalproject/API/apiPost.dart';
+import 'package:finalproject/API/apiUser.dart';
+import 'package:finalproject/Page/detailPlace.page.dart';
+import 'package:finalproject/Page/timeline.page.dart';
+import 'package:finalproject/Tools/responsive.tools.dart';
+import 'package:finalproject/Tools/style.tools.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+
+enum SampleItem { itemOne, itemTwo, itemThree }
+
+class Profile extends StatefulWidget {
+  final String id;
+  final String? info;
+  const Profile({Key? key, required this.id, required this.info})
+    : super(key: key);
+
+  @override
+  State<Profile> createState() => _ProfileState();
+}
+
+class _ProfileState extends State<Profile> {
+  SampleItem? selectedMenu;
+
+  List data = [];
+  String id = '';
+  String img = '';
+  String name = '';
+  String date = '';
+  String name_o = '';
+  String img_o = '';
+  String date_o = '';
+  String status = '';
+
+  @override
+  void initState() {
+    // TODO: implement initState
+    getProfile();
+    getMe();
+    getother();
+    super.initState();
+  }
+
+  Future<List> getProfile() async {
+    try {
+      data = await Profile_info(widget.id);
+    } catch (e) {
+      print(e);
+    }
+    return data;
+  }
+
+  getMe() async {
+    SharedPreferences _prefs = await SharedPreferences.getInstance();
+    setState(() {
+      id = _prefs.getString('id').toString();
+      name = '${_prefs.getString('fName')} ${_prefs.getString('lName')}';
+      img = _prefs.getString('image').toString();
+      date = _prefs.getString('date').toString();
+    });
+  }
+
+  getother() async {
+    var data = await getDetailMember(widget.id);
+    setState(() {
+      name_o = '${data[0]['M_fName']} ${data[0]['M_lName']}';
+      img_o = data[0]['M_Image'].toString();
+      date_o = data[0]['M_bDate'].toString();
+    });
+    TextEditingController str = new TextEditingController();
+    setState(() {
+      str.text = widget.id;
+    });
+    var response = await search_friend(id, str);
+    if (response['status'] == '0') {
+      setState(() {
+        status = 'friend';
+      });
+    } else if (response['status'] == '2') {
+      setState(() {
+        status = '2';
+      });
+    }
+  }
+
+  Future<void> _showMyDialogDeleteCheckin(String cid) async {
+    return showDialog<void>(
+      context: context,
+      barrierDismissible: false, // user must tap button!
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: Text('แจ้งเตือน'),
+          content: SingleChildScrollView(
+            child: ListBody(
+              children: <Widget>[Text('ต้องการลบการเช็คอินออกใช่หรือไม่')],
+            ),
+          ),
+          actions: <Widget>[
+            Center(
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceAround,
+                children: [
+                  ElevatedButton(
+                    style: ButtonStyle(
+                      backgroundColor: WidgetStatePropertyAll(
+                        Color.fromARGB(255, 127, 97, 248),
+                      ),
+                    ),
+                    onPressed: () async {
+                      String value = await delete_Checkin("remove", cid);
+                      if (value == "TRUE") {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('ลบข้อมูลสำเร็จ')),
+                        );
+                        setState(() {
+                          Profile_info(widget.id);
+                        });
+                        Navigator.pop(context);
+                      } else {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('ลบข้อมูลไม่สำเร็จ')),
+                        );
+                      }
+                    },
+                    child: Text('ยืนยัน'),
+                  ),
+                  ElevatedButton(
+                    style: ButtonStyle(
+                      backgroundColor: WidgetStatePropertyAll(Colors.red),
+                    ),
+                    onPressed: () async {
+                      Navigator.pop(context);
+                    },
+                    child: Text('ยกเลิก'),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    double w = displayWidth(context);
+    double h =
+        displayHeight(context) -
+        MediaQuery.of(context).padding.top -
+        kToolbarHeight;
+
+    Container boxImage(List img) {
+      return Container(
+        margin: EdgeInsets.all(10),
+        width: w,
+        height: h * 0.23,
+        decoration: BoxDecoration(
+          border: Border.all(width: 1, color: HexColor('46BBC7')),
+        ),
+        child: Image.network(img.first, fit: BoxFit.contain),
+      );
+    }
+
+    Container boxTwoImage(List img) {
+      return Container(
+        margin: EdgeInsets.all(10),
+        width: w,
+        height: h * 0.23,
+        child: Row(
+          children: <Widget>[
+            Container(
+              width: w * 0.45,
+              height: h * 0.23,
+              decoration: BoxDecoration(
+                border: Border.all(width: 1, color: HexColor('46BBC7')),
+              ),
+              child: Image.network(img.first, fit: BoxFit.contain),
+            ),
+
+            Container(
+              width: w * 0.45,
+              height: h * 0.23,
+              decoration: BoxDecoration(
+                border: Border.all(width: 1, color: HexColor('46BBC7')),
+              ),
+              child: Image.network(img.last, fit: BoxFit.contain),
+            ),
+          ],
+        ),
+      );
+    }
+
+    Container boxImageFull(List img) {
+      return Container(
+        margin: EdgeInsets.all(10),
+        width: w,
+        height: h * 0.23,
+        child: Row(
+          children: <Widget>[
+            Container(
+              width: w * 0.575,
+              height: h * 0.23,
+              decoration: BoxDecoration(
+                border: Border.all(width: 1, color: HexColor('46BBC7')),
+              ),
+              child: Image.network(img.first, fit: BoxFit.contain),
+            ),
+
+            Column(
+              children: [
+                Container(
+                  width: w * 0.325,
+                  height: h * 0.115,
+                  decoration: BoxDecoration(
+                    border: Border.all(width: 1, color: HexColor('46BBC7')),
+                  ),
+                  child: Image.network(img[1], fit: BoxFit.contain),
+                ),
+
+                Container(
+                  width: w * 0.325,
+                  height: h * 0.115,
+                  decoration: BoxDecoration(
+                    border: Border.all(width: 1, color: HexColor('46BBC7')),
+                  ),
+                  child: Image.network(img[2], fit: BoxFit.contain),
+                ),
+              ],
+            ),
+          ],
+        ),
+      );
+    }
+
+    Container boxImageOver(List img) {
+      return Container(
+        margin: EdgeInsets.all(10),
+        width: w,
+        height: h * 0.23,
+        child: Row(
+          children: <Widget>[
+            Container(
+              width: w * 0.575,
+              height: h * 0.23,
+              decoration: BoxDecoration(
+                border: Border.all(width: 1, color: HexColor('46BBC7')),
+              ),
+              child: Image.network(img.first, fit: BoxFit.contain),
+            ),
+
+            Column(
+              children: [
+                Container(
+                  width: w * 0.325,
+                  height: h * 0.115,
+                  decoration: BoxDecoration(
+                    border: Border.all(width: 1, color: HexColor('46BBC7')),
+                  ),
+                  child: Image.network(img[1], fit: BoxFit.contain),
+                ),
+                Container(
+                  width: w * 0.325,
+                  height: h * 0.115,
+                  decoration: BoxDecoration(
+                    image: DecorationImage(
+                      opacity: 0.65,
+                      fit: BoxFit.contain,
+                      image: NetworkImage(img[2]),
+                    ),
+                    border: Border.all(width: 1, color: HexColor('46BBC7')),
+                  ),
+                  child: Center(
+                    child: InkWell(
+                      onTap: () {
+                        _showMyDialogImage(context, img);
+                      },
+                      child: Container(
+                        alignment: Alignment.center,
+                        width: w * 0.11,
+                        height: h * 0.065,
+                        decoration: BoxDecoration(
+                          color: Color.fromARGB(149, 255, 255, 255),
+                          borderRadius: BorderRadius.circular(200),
+                        ),
+                        child: Text(
+                          (img.length - 2).toString(),
+                          style: TextStyle(
+                            fontSize: w * 0.045,
+                            color: Color.fromARGB(175, 0, 0, 0),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      );
+    }
+
+    return Scaffold(
+      body: SafeArea(
+        child: SingleChildScrollView(
+          child: Container(
+            height: h * 1.1,
+            width: w,
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.bottomCenter,
+                end: Alignment.topCenter,
+                colors: [HexColor('#46BBC7'), HexColor('#CEF4F8')],
+              ),
+            ),
+            child: Column(
+              children: [
+                Container(
+                  width: w,
+                  height: h * 0.1,
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Padding(
+                        padding: EdgeInsets.only(left: 5, right: 5),
+                        child: Container(
+                          decoration: BoxDecoration(
+                            color: Color.fromARGB(140, 255, 255, 255),
+                          ),
+                          child: IconButton(
+                            onPressed: () {
+                              Navigator.pop(context, 'TRUE');
+                            },
+                            icon: Icon(Icons.arrow_back),
+                          ),
+                        ),
+                      ),
+                      Padding(
+                        padding: EdgeInsets.all(5),
+                        child:
+                            widget.info == 'me' ||
+                                    widget.info == 'friend' ||
+                                    status == 'friend'
+                                ? null
+                                : status == '2'
+                                ? Container(
+                                  decoration: BoxDecoration(
+                                    color: Color.fromARGB(140, 255, 255, 255),
+                                  ),
+                                  child: IconButton(
+                                    onPressed: () async {
+                                      String value = await cancel_Friend(
+                                        widget.id,
+                                        id,
+                                      );
+                                      if (value == "TRUE") {
+                                        setState(() {
+                                          status = "other";
+                                        });
+                                      }
+                                    },
+                                    icon: Icon(Icons.person_remove_alt_1),
+                                  ),
+                                )
+                                : Container(
+                                  decoration: BoxDecoration(
+                                    color: Color.fromARGB(140, 255, 255, 255),
+                                  ),
+                                  child: IconButton(
+                                    onPressed: () async {
+                                      var data = await addFriend(id, widget.id);
+                                      if (data == "TRUE") {
+                                        setState(() {
+                                          status = '2';
+                                        });
+                                      } else if (data == "FRIEND") {
+                                        setState(() {
+                                          status = 'friend';
+                                        });
+                                      }
+                                    },
+                                    icon: Icon(Icons.person_add),
+                                  ),
+                                ),
+                      ),
+                    ],
+                  ),
+                ),
+                SizedBox(height: h * 0.01),
+                Container(
+                  width: w,
+                  height: 0.25 * h,
+                  margin: EdgeInsets.only(left: 10, right: 10),
+                  decoration: BoxDecoration(color: Colors.white),
+                  // decoration: BoxDecoration(color: Colors.white),
+                  child: Padding(
+                    padding: EdgeInsets.only(left: 10, right: 10),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                      children: [
+                        Container(
+                          width: w * 0.325,
+                          height: h * 0.185,
+                          alignment: Alignment.centerLeft,
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(100),
+                            image: DecorationImage(
+                              image: NetworkImage(
+                                widget.info == 'me' ? img : img_o,
+                              ),
+                              fit: BoxFit.fill,
+                            ),
+                          ),
+                        ),
+                        Container(
+                          width: w * 0.5,
+                          height: h * 0.25,
+                          alignment: Alignment.centerLeft,
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Text(
+                                widget.info == 'me' ? name : name_o,
+                                style: styleText.styleNameProfile,
+                              ),
+                              SizedBox(height: 10),
+                              Text(
+                                'ID : ${widget.id}',
+                                style: styleText.styleIDProfile,
+                              ),
+                              Row(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Icon(Icons.cake, size: 18),
+                                  Text(
+                                    widget.info == 'me' ? ' $date' : ' $date_o',
+                                    style: styleText.styleIDProfile,
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                Padding(
+                  padding: EdgeInsets.all(10),
+                  child: Container(
+                    decoration: BoxDecoration(
+                      border: BorderDirectional(
+                        bottom: BorderSide(width: 1, color: Colors.black),
+                      ),
+                    ),
+                  ),
+                ),
+                Expanded(
+                  child: FutureBuilder(
+                    future: getProfile(),
+                    builder: (
+                      BuildContext context,
+                      AsyncSnapshot<List> snapshot,
+                    ) {
+                      if (ConnectionState.active != null && !snapshot.hasData) {
+                        return const Center(child: CircularProgressIndicator());
+                      }
+                      return ListView.builder(
+                        itemCount: data.length,
+                        itemBuilder: (BuildContext buildContext, int index) {
+                          return Padding(
+                            padding: EdgeInsets.fromLTRB(10, 5, 10, 5),
+                            child: Container(
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(15),
+                              ),
+                              child: Column(
+                                children: [
+                                  Container(
+                                    child: Row(
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.start,
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Padding(
+                                          padding: EdgeInsets.all(10),
+                                          child: CircleAvatar(
+                                            radius: 30,
+                                            backgroundImage: NetworkImage(
+                                              data[index]['Profile_Image'],
+                                              scale: 1.0,
+                                            ),
+                                            backgroundColor: Colors.transparent,
+                                          ),
+                                        ),
+                                        Wrap(
+                                          direction: Axis.vertical,
+                                          spacing: 2,
+                                          crossAxisAlignment:
+                                              WrapCrossAlignment.start,
+                                          children: [
+                                            Row(
+                                              crossAxisAlignment:
+                                                  CrossAxisAlignment.center,
+                                              children: [
+                                                Container(
+                                                  alignment:
+                                                      Alignment.bottomLeft,
+                                                  width: w * 0.625,
+                                                  height: h * 0.05,
+                                                  padding: EdgeInsets.only(
+                                                    left: 5,
+                                                  ),
+                                                  child: Row(
+                                                    mainAxisAlignment:
+                                                        MainAxisAlignment.start,
+                                                    crossAxisAlignment:
+                                                        CrossAxisAlignment.end,
+                                                    children: [
+                                                      Text(
+                                                        data[index]['Profile_Name']
+                                                                    .toString()
+                                                                    .length >
+                                                                30
+                                                            ? data[index]['Profile_Name']
+                                                                    .substring(
+                                                                      0,
+                                                                      30,
+                                                                    ) +
+                                                                '...'
+                                                            : data[index]['Profile_Name'],
+                                                        style: TextStyle(
+                                                          fontWeight:
+                                                              FontWeight.bold,
+                                                          fontSize: h * 0.0235,
+                                                        ),
+                                                      ),
+                                                    ],
+                                                  ),
+                                                ),
+                                                widget.info == 'me'
+                                                    ? Container(
+                                                      alignment:
+                                                          Alignment.centerRight,
+                                                      width: w * 0.085,
+                                                      height: h * 0.045,
+                                                      child: PopupMenuButton<
+                                                        SampleItem
+                                                      >(
+                                                        initialValue:
+                                                            selectedMenu,
+                                                        // Callback that sets the selected popup menu item.
+                                                        onSelected: (
+                                                          SampleItem item,
+                                                        ) async {
+                                                          setState(() {
+                                                            selectedMenu = item;
+                                                          });
+                                                          if (selectedMenu ==
+                                                              SampleItem
+                                                                  .itemTwo) {
+                                                            _showMyDialogDeleteCheckin(
+                                                              data[index]['C_ID'],
+                                                            );
+                                                          } else if (selectedMenu ==
+                                                              SampleItem
+                                                                  .itemOne) {
+                                                            String
+                                                            value = await Navigator.push(
+                                                              context,
+                                                              MaterialPageRoute(
+                                                                builder:
+                                                                    (
+                                                                      context,
+                                                                    ) => EditCheckin(
+                                                                      cid:
+                                                                          data[index]['C_ID'],
+                                                                    ),
+                                                              ),
+                                                            );
+                                                            if (value ==
+                                                                "TRUE") {
+                                                              setState(() {
+                                                                getProfile();
+                                                              });
+                                                            }
+                                                          } else if (selectedMenu ==
+                                                              SampleItem
+                                                                  .itemThree) {}
+                                                        },
+                                                        itemBuilder:
+                                                            (
+                                                              BuildContext
+                                                              context,
+                                                            ) => <
+                                                              PopupMenuEntry<
+                                                                SampleItem
+                                                              >
+                                                            >[
+                                                              const PopupMenuItem<
+                                                                SampleItem
+                                                              >(
+                                                                value:
+                                                                    SampleItem
+                                                                        .itemOne,
+                                                                child: Text(
+                                                                  'แก้ไข',
+                                                                ),
+                                                              ),
+                                                              const PopupMenuItem<
+                                                                SampleItem
+                                                              >(
+                                                                value:
+                                                                    SampleItem
+                                                                        .itemTwo,
+                                                                child: Text(
+                                                                  'ลบ',
+                                                                ),
+                                                              ),
+                                                              const PopupMenuItem<
+                                                                SampleItem
+                                                              >(
+                                                                value:
+                                                                    SampleItem
+                                                                        .itemThree,
+                                                                child: Text(
+                                                                  'แชร์ Facebook',
+                                                                ),
+                                                              ),
+                                                            ],
+                                                      ),
+                                                    )
+                                                    : Container(),
+                                              ],
+                                            ),
+                                            Container(
+                                              width: w * 0.65,
+                                              height: h * 0.035,
+                                              alignment: Alignment.topCenter,
+                                              child: Row(
+                                                children: [
+                                                  Icon(
+                                                    Icons.location_on,
+                                                    size: w * 0.045,
+                                                    color: HexColor('46BBC7'),
+                                                  ),
+                                                  InkWell(
+                                                    onTap: () {
+                                                      Navigator.push(
+                                                        context,
+                                                        MaterialPageRoute(
+                                                          builder:
+                                                              (
+                                                                context,
+                                                              ) => DetailPlace(
+                                                                id:
+                                                                    data[index]['P_ID'],
+                                                              ),
+                                                        ),
+                                                      );
+                                                    },
+                                                    child: Text(
+                                                      data[index]['Place_Name']
+                                                                  .toString()
+                                                                  .length >
+                                                              25
+                                                          ? data[index]['Place_Name']
+                                                                  .substring(
+                                                                    0,
+                                                                    25,
+                                                                  ) +
+                                                              '...'
+                                                          : data[index]['Place_Name'],
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  // Container(
+                                  //   alignment: Alignment.center,
+                                  //   width: w * 0.65,
+                                  //   height:
+                                  //       data[index]['C_Image'].length == 0
+                                  //           ? 0
+                                  //           : h * 0.165,
+                                  //   child: Scrollbar(
+                                  //     trackVisibility: true,
+                                  //     child: PageView.builder(
+                                  //       itemCount:
+                                  //           data[index]['C_Image'].length,
+                                  //       pageSnapping: true,
+                                  //       padEnds: false,
+                                  //       itemBuilder: (context, i) {
+                                  //         return Container(
+                                  //           child: Image.network(
+                                  //             data[index]['C_Image'][i],
+                                  //             fit: BoxFit.fitHeight,
+                                  //           ),
+                                  //         );
+                                  //       },
+                                  //     ),
+                                  //   ),
+                                  // ),
+                                  Container(
+                                    padding: EdgeInsets.only(
+                                      left: 10,
+                                      right: 10,
+                                    ),
+                                    width: w,
+                                    child: Text('${data[index]['C_Text']}'),
+                                  ),
+                                  // data[index]['C_Image'].length == 1
+                                  //     ? boxImage(data[index]['C_Image'])
+                                  //     : data[index]['C_Image'].length == 2
+                                  //     ? boxTwoImage(data[index]['C_Image'])
+                                  //     : data[index]['C_Image'].length == 3
+                                  //     ? boxImageFull(data[index]['C_Image'])
+                                  //     : data[index]['C_Image'].length > 3
+                                  //     ? boxImageOver(data[index]['C_Image'])
+                                  //     : Container(),
+                                  Container(
+                                    alignment: Alignment.centerLeft,
+                                    padding: EdgeInsets.only(top: 5, left: 10),
+                                    width: w,
+                                    child: Text(
+                                      'วันที่ ' +
+                                          data[index]['date'].toString(),
+                                      style: TextStyle(color: Colors.black54),
+                                    ),
+                                  ),
+                                  SizedBox(height: 10),
+                                ],
+                              ),
+                            ),
+                          );
+                        },
+                      );
+                    },
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+Future<void> _showMyDialogImage(BuildContext context, List image) async {
+  return showDialog<void>(
+    context: context,
+    barrierDismissible: true, // user must tap button!
+    builder: (BuildContext context) {
+      return AlertDialog(
+        content: SingleChildScrollView(
+          child: ListBody(
+            children: [
+              Container(
+                width: 300,
+                height: 300,
+                child: Scrollbar(
+                  child: PageView.builder(
+                    itemCount: image.length,
+                    pageSnapping: true,
+                    padEnds: false,
+                    itemBuilder: (context, i) {
+                      return Container(
+                        child: Image.network(image[i], fit: BoxFit.fitHeight),
+                      );
+                    },
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    },
+  );
+}
