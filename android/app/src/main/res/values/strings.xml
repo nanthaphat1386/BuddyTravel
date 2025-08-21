@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Buddy Travel</string>
+    <string name="facebook_app_id">1112255067397776</string>
+    <string name="fb_login_protocol_scheme">fb1112255067397776</string>
+    <string name="facebook_client_token">8b1a06553f25a72dc9be38d03d50a32c</string>
+</resources>
